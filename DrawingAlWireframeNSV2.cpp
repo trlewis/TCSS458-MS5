@@ -2,10 +2,12 @@
 #include "Angel.h"
 #include <string.h>
 
+#include <iostream>
+
 typedef Angel::vec4  color4;
 typedef Angel::vec4  point4;
 
-#define MAX_VERT 20000 
+#define MAX_VERT 40000//20000
 point4 data[MAX_VERT];
 point4 colors[MAX_VERT];
 int dataSize = 0;  // how many vertices
@@ -83,6 +85,8 @@ void readFile() {
 				int v[50];
 				int vCount = parseVertString(verticesString,v);
 
+				std::cout << "vertices count: " << vCount << std::endl;
+
 			    // ONLY USING THE FIRST 3 ... this code must be improved
 				v1 = v[0];
 				v2 = v[1];
@@ -95,15 +99,29 @@ void readFile() {
 					system("PAUSE");
 	                exit(1);
 				}
+
+				//this replaces the commented out code below
+				for(int i = 0 ; i < vCount-1 ; i++) {
+					colors[dataSize] = color4(r,g,b,1);
+					data[dataSize++] = vertices[v[0]];
+					colors[dataSize] = color4(r,g,b,1);
+					data[dataSize++] = vertices[v[i]];
+					colors[dataSize] = color4(r,g,b,1);
+					data[dataSize++] = vertices[v[i+1]];
+				}
+
 				// filling in 3 vertices to form a triangle
 				// also 3 colors, one for each vertex
 				// corresponding colors and vertices are at the same index in each array 
-				colors[dataSize] = color4(r,g,b,1);
-				data[dataSize++] = vertices[v1];
-				colors[dataSize] = color4(r,g,b,1);
-				data[dataSize++] = vertices[v2];
-				colors[dataSize] = color4(r,g,b,1);
-				data[dataSize++] = vertices[v3];
+//				colors[dataSize] = color4(r,g,b,1);
+//				data[dataSize++] = vertices[v1];
+//				colors[dataSize] = color4(r,g,b,1);
+//				data[dataSize++] = vertices[v2];
+//				colors[dataSize] = color4(r,g,b,1);
+//				data[dataSize++] = vertices[v3];
+
+
+
 			} else {  // line began with something else - ignore for now
 				fscanf(input, "%[^\n]%*c", str2);
 				//printf("Junk line : %s %s\n", str1, str2);
