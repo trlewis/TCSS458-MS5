@@ -1,18 +1,21 @@
 
+
 #include "Angel.h"
 #include <string.h>
 
 #include <iostream>
 
+#include "materials.hpp"
+
 typedef Angel::vec4  color4;
 typedef Angel::vec4  point4;
 
-#define MAX_VERT 40000//20000
+#define MAX_VERT 35000//20000
 point4 data[MAX_VERT];
 point4 colors[MAX_VERT];
 int dataSize = 0;  // how many vertices
 
-
+point4 light_position( 0.0, 0.0, 1.0, 0.0 );
 mat4 CTM;
 
 // shader variable locations
@@ -21,6 +24,9 @@ GLuint bufferID;
 GLuint vPositionLoc;
 GLuint vColorLoc;
 GLuint ctmID;
+
+//list of materials
+MaterialList mtll;
 
 float yRot = 0.0;
 
@@ -47,6 +53,8 @@ int parseVertString(char * verticesString, int v[]) {
 }
 
 void readFile() {
+	Material m;
+	bool readfirstg = false;
 
     char fileName[50];
     char str1[300];
@@ -62,13 +70,25 @@ void readFile() {
 
 	printf("Enter the name of the input file (no blanks): ");
 	gets(fileName);
-
 	input = fopen(fileName, "r+");
+
     if (input == NULL)
         perror ("Error opening file");
     else {
         while(feof(input)== 0){
             fscanf(input,"%s",str1);
+			if(strcmp(str1,"mtllib")==0) {
+				fscanf(input,"%s",str1);
+				mtll = MaterialList(str1);
+			}
+			if(strcmp(str1,"g")==0) {
+				if(readfirstg) {
+					fscanf(input,"%s",str1);
+					m = mtll.getMaterial(str1);
+				}
+				else
+					readfirstg = true;
+			}
 			if (strcmp(str1,"v")==0) {  // lines starting with v  =  a vertex 
 				fscanf(input,"%f %f %f", &x, &y, &z);
 				vertices[numVertices++] = vec4(x,y,z,1);
@@ -78,50 +98,26 @@ void readFile() {
 				// Code upgrade
 				// The number of vertices that follow "f" is variable
 				// so here is some code to gather all the integers into an array
-
 				char verticesString[200];
 				fgets(verticesString, 200, input);
 
 				int v[50];
 				int vCount = parseVertString(verticesString,v);
 
-				std::cout << "vertices count: " << vCount << std::endl;
-
-			    // ONLY USING THE FIRST 3 ... this code must be improved
-				v1 = v[0];
-				v2 = v[1];
-				v3 = v[2];
-
-				// generate a random color
-				float r = rand()%256/255.0, g = rand()%256/255.0 , b = rand()%256/255.0; 
 				if (dataSize+3 > MAX_VERT) {
 					printf("Arrays are not big enough!\n");
 					system("PAUSE");
 	                exit(1);
 				}
 
-				//this replaces the commented out code below
 				for(int i = 0 ; i < vCount-1 ; i++) {
-					colors[dataSize] = color4(r,g,b,1);
+					colors[dataSize] = m.diffuse;
 					data[dataSize++] = vertices[v[0]];
-					colors[dataSize] = color4(r,g,b,1);
+					colors[dataSize] = m.diffuse;
 					data[dataSize++] = vertices[v[i]];
-					colors[dataSize] = color4(r,g,b,1);
+					colors[dataSize] = m.diffuse;
 					data[dataSize++] = vertices[v[i+1]];
 				}
-
-				// filling in 3 vertices to form a triangle
-				// also 3 colors, one for each vertex
-				// corresponding colors and vertices are at the same index in each array 
-//				colors[dataSize] = color4(r,g,b,1);
-//				data[dataSize++] = vertices[v1];
-//				colors[dataSize] = color4(r,g,b,1);
-//				data[dataSize++] = vertices[v2];
-//				colors[dataSize] = color4(r,g,b,1);
-//				data[dataSize++] = vertices[v3];
-
-
-
 			} else {  // line began with something else - ignore for now
 				fscanf(input, "%[^\n]%*c", str2);
 				//printf("Junk line : %s %s\n", str1, str2);
@@ -131,35 +127,47 @@ void readFile() {
 	printf("Facet count = %d\n",facetCount);
 }
 
-
-
-
-
 void init()
 {
+	// setting light properties
+	color4 light_diffuse( 0.4, 0.4, 0.4, 1.0 );
+	glEnable(GL_LIGHTING);
+	glEnable(GL_LIGHT0);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
+
+	glEnable( GL_DEPTH_TEST );
+
     readFile();
-    glClearColor(1.0, 1.0, 1.0, 1.0); /* white background */
+    glClearColor(1.0, 1.0, 1.0, 1.0); // white background
+}
+
+void tri(int i) {
+	vec4 v1 = data[i];
+	vec4 v2 = data[i+1];
+	vec4 v3 = data[i+2];
+	vec4 normal = normalize(cross(v3-v1,v2-v1));
+
+	glMaterialfv(GL_FRONT, GL_DIFFUSE, colors[i]);
+
+	glBegin(GL_POLYGON);
+	glNormal3f(normal.x,normal.y,normal.z);
+	glVertex3fv(v1);
+	glVertex3fv(v2);
+	glVertex3fv(v3);
+	glEnd();
 }
 
 void display()
 {
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	glRotatef(yRot,0,1,0);
 	glScalef(0.3, 0.3, -0.3);
 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);  
-
-    for (int v = 0; v < dataSize; v += 3) {
-		glBegin(GL_POLYGON);
-		glColor3fv(colors[v]);
-		glVertex3fv(data[v]);
-		glColor3fv(colors[v+1]);
-		glVertex3fv(data[v+1]);
-		glColor3fv(colors[v+2]);
-		glVertex3fv(data[v+2]);
-		glEnd();
-	}
+    for (int v = 0; v < dataSize; v += 3)
+		tri(v);
 
     glutSwapBuffers();
 }
@@ -202,7 +210,7 @@ int main(int argc, char** argv)
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
     glutInitWindowSize(512, 512);
-    glutCreateWindow("Defective Al Capone - No Shaders");
+    glutCreateWindow("Non-Defective Al Capone - No Shaders (Travis Lewis)");
 
     init();
 
@@ -215,3 +223,4 @@ int main(int argc, char** argv)
     glutMainLoop();
     return 0;
 }
+
